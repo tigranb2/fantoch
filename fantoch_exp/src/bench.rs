@@ -209,7 +209,7 @@ async fn run_experiment(
 ) -> Result<(), Report> {
     // holder of dstat processes to be launched in all machines
     let mut dstats = Vec::with_capacity(machines.vm_count());
-    println!("line 212");
+    
     // start processes
     let start = start_processes(
         machines,
@@ -318,7 +318,7 @@ async fn run_experiment(
         // if not, simply wait for stop to finish
         pull_metrics_and_stop.await
     }
-    println!("line 321");
+    
 }
 
 async fn start_processes(
