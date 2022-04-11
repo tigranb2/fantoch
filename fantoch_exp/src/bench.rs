@@ -70,6 +70,7 @@ pub async fn bench_experiment(
             tracing::info!("nothing to cleanup on AWS");
         }
     }
+    println!("line 73");
 
     for batch_max_size in &batch_max_sizes {
         for &(protocol, config) in &configs {
@@ -81,6 +82,7 @@ pub async fn bench_experiment(
                         config.n() * config.shard_count(),
                         "not enough server machines"
                     );
+                    println!("line 85");
 
                     // check that we have the correct number of client machines
                     assert_eq!(
@@ -88,12 +90,14 @@ pub async fn bench_experiment(
                         config.n(),
                         "not enough client machines"
                     );
+                    println!("line 93");
 
                     // maybe skip configuration
                     if skip(protocol, config, clients) {
                         progress.inc();
                         continue;
                     }
+                    println!("line 100");
 
                     if let KeyGen::ConflictPool { .. } = workload.key_gen() {
                         if workload.shard_count() > 1 {
@@ -120,6 +124,7 @@ pub async fn bench_experiment(
                             panic!("conflict rate key generator is not suitable for partial replication");
                         }
                     }
+                    println!("line 127");
 
                     loop {
                         let exp_dir = create_exp_dir(&results_dir)
@@ -129,6 +134,9 @@ pub async fn bench_experiment(
                             "experiment metrics will be saved in {}",
                             exp_dir
                         );
+                        
+                        println!("line 138");
+                        
                         let run = run_experiment(
                             &machines,
                             run_mode,
@@ -146,6 +154,7 @@ pub async fn bench_experiment(
                             experiment_timeouts,
                             &exp_dir,
                         );
+                        println!("line 157");
                         if let Err(e) = run.await {
                             // check if it's a timeout error
                             match e.downcast_ref::<TimeoutError>() {
@@ -164,6 +173,7 @@ pub async fn bench_experiment(
                                     return Err(e);
                                 }
                             }
+                            println!("line 176");
                         } else {
                             // if there's no error, then exit the loop and run
                             // the next experiment
@@ -171,6 +181,7 @@ pub async fn bench_experiment(
                             progress.inc();
                             break;
                         }
+                        println!("line 184");
                     }
                 }
             }
@@ -198,7 +209,7 @@ async fn run_experiment(
 ) -> Result<(), Report> {
     // holder of dstat processes to be launched in all machines
     let mut dstats = Vec::with_capacity(machines.vm_count());
-
+    println!("line 212");
     // start processes
     let start = start_processes(
         machines,
@@ -211,6 +222,7 @@ async fn run_experiment(
         cpus,
         &mut dstats,
     );
+    println!("line 225");
     // check if a start timeout was set
     let start_result = if let Some(timeout) = experiment_timeouts.start {
         // if yes, abort experiment if timeout triggers
@@ -220,11 +232,14 @@ async fn run_experiment(
                 return Err(Report::new(TimeoutError("start processes")));
             }
         }
+        println!("line 235");
     } else {
         // if no, simply wait for start to finish
         start.await
     };
+    println!("line 240");
     let (process_ips, processes) = start_result.wrap_err("start_processes")?;
+    println!("line 242");
 
     // run clients
     let run_clients = run_clients(
@@ -236,6 +251,7 @@ async fn run_experiment(
         process_ips,
         &mut dstats,
     );
+    println!("line 253");
     // check if a run timeout was set
     let run_clients_result = if let Some(timeout) = experiment_timeouts.run {
         // if yes, abort experiment if timeout triggers
@@ -245,15 +261,17 @@ async fn run_experiment(
                 return Err(Report::new(TimeoutError("run clients")));
             }
         }
+        println!("line 264");
     } else {
         // if not, simply wait for run to finish
         run_clients.await
     };
+    println!("line 269");
     run_clients_result.wrap_err("run_clients")?;
-
+    println!("line 271");
     // stop dstat
     stop_dstats(machines, dstats).await.wrap_err("stop_dstat")?;
-
+    println!("line 274");
     // create experiment config and pull metrics
     let exp_config = ExperimentConfig::new(
         machines.placement().clone(),
@@ -269,6 +287,7 @@ async fn run_experiment(
         batch_max_delay,
         cpus,
     );
+    println!("line 290");
 
     let pull_metrics_and_stop = async {
         pull_metrics(machines, exp_config, &exp_dir)
@@ -283,6 +302,7 @@ async fn run_experiment(
 
         Ok(())
     };
+    println!("line 305");
 
     // check if a stop was set
     if let Some(timeout) = experiment_timeouts.stop {
@@ -293,10 +313,12 @@ async fn run_experiment(
                 return Err(Report::new(TimeoutError("pull metrics and stop processes")));
             }
         }
+        println!("line 316");
     } else {
         // if not, simply wait for stop to finish
         pull_metrics_and_stop.await
     }
+    println!("line 321");
 }
 
 async fn start_processes(
@@ -334,6 +356,7 @@ async fn start_processes(
             *shard_id,
             *region_index,
         );
+        println!("line 359");
 
         // get ips to connect to (based on sorted)
         let ips = sorted
@@ -351,10 +374,12 @@ async fn start_processes(
                 (*peer_id, ip, delay)
             })
             .collect();
+        println!("line 377");
 
         // set sorted only if on baremetal and no delay will be injected
         let set_sorted = testbed == Testbed::Baremetal && planet.is_none();
         let sorted = if set_sorted { Some(sorted) } else { None };
+        println!("line 382");
 
         // compute process type
         let process_type = ProcessType::Server(*process_id);
@@ -368,6 +393,7 @@ async fn start_processes(
         // start dstat and save it
         let dstat = start_dstat(dstat_file, vm).await?;
         dstats.push(dstat);
+        println!("line 396");
 
         // create protocol config and generate args
         let protocol_config = ProtocolConfig::new(
@@ -382,6 +408,7 @@ async fn start_processes(
             log_file,
         );
         let args = protocol_config.to_args();
+        println!("line 411");
 
         let command = crate::machine::fantoch_bin_script(
             process_type,
@@ -391,6 +418,7 @@ async fn start_processes(
             max_log_level,
             err_file,
         );
+        println!("line 421");
         let process = vm
             .prepare_exec(command)
             .spawn()
@@ -398,12 +426,14 @@ async fn start_processes(
         processes.insert(*process_id, (from_region.clone(), process));
 
         wait_processes.push(wait_process_started(process_id, &vm));
+        println!("line 429");
     }
 
     // wait all processse started
     for result in futures::future::join_all(wait_processes).await {
         let () = result?;
     }
+    println!("line 436");
 
     Ok((ips, processes))
 }
@@ -435,7 +465,8 @@ async fn run_clients(
 ) -> Result<(), Report> {
     let mut clients = HashMap::with_capacity(machines.client_count());
     let mut wait_clients = Vec::with_capacity(machines.client_count());
-
+    println!("line 468");
+    
     for (region, vm) in machines.clients() {
         // find all processes in this region (we have more than one there's more
         // than one shard)
@@ -447,7 +478,7 @@ async fn run_clients(
         // - and then compute id start: subtract `clients_per_machine` and add 1
         let id_end = region_index as usize * clients_per_region;
         let id_start = id_end - clients_per_region + 1;
-
+        println!("line 481");
         // get ips of all processes in this region
         let ips = processes_in_region
             .iter()
@@ -459,6 +490,7 @@ async fn run_clients(
                 (*process_id, ip)
             })
             .collect();
+        println!("line 493");
 
         // compute process type
         let process_type = ProcessType::Client(region_index);
@@ -468,10 +500,12 @@ async fn run_clients(
         let err_file = config::run_file(process_type, ERR_FILE_EXT);
         let dstat_file = config::run_file(process_type, DSTAT_FILE_EXT);
         let metrics_file = config::run_file(process_type, METRICS_FILE_EXT);
-
+        println!("line 503");
+        
         // start dstat and save it
         let dstat = start_dstat(dstat_file, vm).await?;
         dstats.push(dstat);
+        println!("line 508");
 
         // create client config and generate args
         let client_config = ClientConfig::new(
@@ -484,7 +518,9 @@ async fn run_clients(
             metrics_file,
             log_file,
         );
+        println!("line 521");
         let args = client_config.to_args();
+        println!("line 523");
 
         let command = crate::machine::fantoch_bin_script(
             process_type,
@@ -496,6 +532,7 @@ async fn run_clients(
             &tracing::Level::INFO,
             err_file,
         );
+        println!("line 535");
         let client = vm
             .prepare_exec(command)
             .spawn()
@@ -530,6 +567,7 @@ async fn stop_processes(
                 "ps -aux | grep heaptrack | grep ' \\-\\-id {}' | grep -v 'bash -c'",
                 process_id
             );
+            println!("line 570");
             let heaptrack_process =
                 vm.exec(command).await.wrap_err("ps heaptrack")?;
             tracing::debug!("{}: {}", process_id, heaptrack_process);
@@ -541,6 +579,7 @@ async fn stop_processes(
                 1,
                 "there should be a single heaptrack process"
             );
+            println!("line 582");
 
             // compute heaptrack pid
             let parts: Vec<_> = lines[0].split_whitespace().collect();
@@ -552,6 +591,7 @@ async fn stop_processes(
         } else {
             None
         };
+        println!("line 594");
 
         // kill ssh process
         if let Err(e) = pchild.kill().await {
@@ -562,11 +602,13 @@ async fn stop_processes(
                 e
             );
         }
+        println!("line 605");
 
         // stop process
         stop_process(vm, process_id, &region)
             .await
             .wrap_err("stop_process")?;
+        println!("line 611");
 
         wait_processes.push(wait_process_ended(
             protocol,
@@ -577,6 +619,7 @@ async fn stop_processes(
             run_mode,
             &exp_dir,
         ));
+        println!("line 622");
     }
 
     // wait all processse started
@@ -606,6 +649,7 @@ async fn stop_process(
         .collect();
     pids.sort();
     pids.dedup();
+    println!("line 652");
 
     // there should be at most one pid
     match pids.len() {
@@ -633,7 +677,7 @@ async fn wait_process_started(
 ) -> Result<(), Report> {
     // small delay between calls
     let duration = tokio::time::Duration::from_secs(2);
-
+    println!("line 680");
     // compute process type and log file
     let process_type = ProcessType::Server(*process_id);
     let log_file = config::run_file(process_type, LOG_FILE_EXT);
@@ -664,6 +708,7 @@ async fn wait_process_ended(
 ) -> Result<(), Report> {
     // small delay between calls
     let duration = tokio::time::Duration::from_secs(2);
+    println!("line 711");
 
     let mut count = 1;
     while count != 0 {
@@ -680,12 +725,14 @@ async fn wait_process_ended(
             count = stdout.parse::<usize>().wrap_err("lsof | wc parse")?;
         }
     }
+    println!("line 728");
 
     tracing::info!(
         "process {} in region {:?} terminated successfully",
         process_id,
         region
     );
+    println!("line 735");
 
     // compute process type
     let process_type = ProcessType::Server(process_id);
@@ -712,6 +759,7 @@ async fn wait_process_ended(
                         stdout.parse::<usize>().wrap_err("ps | wc parse")?;
                 }
             }
+            println!("line 762");
 
             // once the flamegraph process is not running, we can grab the
             // flamegraph file
@@ -733,6 +781,7 @@ async fn wait_process_ended(
             .await
             .wrap_err("pull_heaptrack_file")?;
         }
+        println!("line 784");
     }
     Ok(())
 }
@@ -744,11 +793,13 @@ async fn wait_client_ended(
 ) -> Result<(), Report> {
     // small delay between calls
     let duration = tokio::time::Duration::from_secs(10);
+    println!("line 796");
 
     // compute process type and log file
     let process_type = ProcessType::Client(region_index);
     let log_file = config::run_file(process_type, LOG_FILE_EXT);
-
+    println!("line 801");
+    
     let mut count = 0;
     while count != 1 {
         tokio::time::sleep(duration).await;
@@ -760,6 +811,7 @@ async fn wait_client_ended(
             count = stdout.parse::<usize>().wrap_err("grep -c parse")?;
         }
     }
+    println!("line 814");
 
     tracing::info!(
         "client {} in region {:?} terminated successfully",
@@ -797,6 +849,7 @@ async fn stop_dstats(
             );
         }
     }
+    println!("line 852");
 
     // stop dstats in parallel
     let mut stops = Vec::new();
@@ -820,6 +873,7 @@ async fn stop_dstat(vm: &Machine<'_>) -> Result<(), Report> {
         .collect();
     pids.sort();
     pids.dedup();
+    println!("line 876");
 
     // there should be at most one pid
     match pids.len() {
@@ -862,6 +916,7 @@ async fn check_no_dstat(vm: &Machine<'_>) -> Result<(), Report> {
             }
         }
     }
+    println!("line 919");
 }
 
 async fn pull_metrics(
@@ -876,6 +931,7 @@ async fn pull_metrics(
         SerializationFormat::Json,
     )
     .wrap_err("save_exp_config")?;
+    println!("line 934");
 
     let mut pulls = Vec::with_capacity(machines.vm_count());
     // prepare server metrics pull
@@ -885,6 +941,7 @@ async fn pull_metrics(
         let process_type = ProcessType::Server(*process_id);
         pulls.push(pull_metrics_files(process_type, region, vm, &exp_dir));
     }
+    println!("line 944");
     // prepare client metrics pull
     for (region, vm) in machines.clients() {
         // compute region index and process type
@@ -897,6 +954,7 @@ async fn pull_metrics(
     for result in futures::future::join_all(pulls).await {
         let _ = result.wrap_err("pull_metrics")?;
     }
+    println!("line 957");
 
     Ok(())
 }
@@ -927,42 +985,48 @@ async fn pull_metrics_files(
 ) -> Result<(), Report> {
     // compute filename prefix
     let prefix = config::file_prefix(process_type, region);
+    println!("line 988");
 
     // compute files to be pulled
     let log_file = config::run_file(process_type, LOG_FILE_EXT);
     let err_file = config::run_file(process_type, ERR_FILE_EXT);
     let dstat_file = config::run_file(process_type, DSTAT_FILE_EXT);
     let metrics_file = config::run_file(process_type, METRICS_FILE_EXT);
-
+    println!("line 955");
     // pull log file
     let local_path = format!("{}/{}.log", exp_dir, prefix);
     vm.copy_from(&log_file, local_path)
         .await
         .wrap_err("copy log")?;
+    println!("line 1001");
 
     // pull err file
     let local_path = format!("{}/{}.err", exp_dir, prefix);
     vm.copy_from(&err_file, local_path)
         .await
         .wrap_err("copy err")?;
+    println!("line 1008");
 
     // pull dstat
     let local_path = format!("{}/{}_dstat.csv", exp_dir, prefix);
     vm.copy_from(&dstat_file, local_path)
         .await
         .wrap_err("copy dstat")?;
+    println!("line 1015");
 
     // pull metrics file
     let local_path = format!("{}/{}_metrics.bincode.gz", exp_dir, prefix);
     vm.copy_from(&metrics_file, local_path)
         .await
         .wrap_err("copy metrics")?;
+    println!("line 1022");
 
     // remove metric files:
     // - note that in the case of `Process::Server`, the metrics file is
     //   generated periodic, and thus, remove it makes little sense
     let to_remove = format!("rm {} {} {}", log_file, dstat_file, metrics_file);
     vm.exec(to_remove).await.wrap_err("remove files")?;
+    println!("line 1029");
 
     match process_type {
         ProcessType::Server(process_id) => {
@@ -988,6 +1052,7 @@ async fn pull_flamegraph_file(
 ) -> Result<(), Report> {
     // compute flamegraph file
     let flamegraph_file = config::run_file(process_type, FLAMEGRAPH_FILE_EXT);
+    println!("line 1055");
 
     // compute filename prefix
     let prefix = config::file_prefix(process_type, region);
@@ -995,6 +1060,7 @@ async fn pull_flamegraph_file(
     vm.copy_from(&flamegraph_file, local_path)
         .await
         .wrap_err("copy flamegraph")?;
+    println!("line 1063");
 
     // remove flamegraph file
     let command = format!("rm {}", flamegraph_file);
@@ -1013,6 +1079,7 @@ async fn pull_heaptrack_file(
     // compute heaptrack filename: heaptrack.BINARY.PID.gz
     let heaptrack =
         format!("heaptrack.{}.{}.gz", protocol.binary(), heaptrack_pid);
+    println!("line 1082");
 
     // compute filename prefix
     let prefix = config::file_prefix(process_type, region);
@@ -1035,6 +1102,7 @@ pub async fn cleanup(
     stop_dstats(machines, Vec::new())
         .await
         .wrap_err("stop_dstats")?;
+    println!("line 1105");
 
     // do the rest of the cleanup
     let mut cleanups = Vec::new();
@@ -1043,14 +1111,18 @@ pub async fn cleanup(
             cleanups.push(cleanup_machine(vm, protocol.binary()));
         }
     }
+    println!("line 1114");
+    
     for (_, vm) in machines.clients() {
         cleanups.push(cleanup_machine(vm, "client"));
     }
+    println!("line 1119");
 
     // cleanup all machines in parallel
     for result in futures::future::join_all(cleanups).await {
         let _ = result.wrap_err("cleanup")?;
     }
+    println!("line 1125");
     Ok(())
 }
 
@@ -1062,13 +1134,16 @@ async fn cleanup_machine(
     vm.exec("pkill flamegraph")
         .await
         .wrap_err("pkill flamegraph")?;
+    println!("line 1137");
     vm.exec("pkill heaptrack")
         .await
         .wrap_err("pkill heaptrack")?;
+    println!("line 1141");
 
     // kill the binary
     let command = format!("pkill {}", binary);
     vm.exec(command).await.wrap_err("pkill binary")?;
+    println!("line 1146");
 
     // wait for binary to end
     let mut count = 1;
@@ -1077,12 +1152,14 @@ async fn cleanup_machine(
             "ps -aux | grep fantoch/target/release/{} | grep -v grep | wc -l",
             binary
         );
+        println!("line 1155");
         let stdout = vm.exec(&command).await.wrap_err("ps -aux | wc")?;
         if stdout.is_empty() {
             tracing::warn!("empty output from: {}", command);
         } else {
             count = stdout.parse::<usize>().wrap_err("ps -aux | wc parse")?;
         }
+        println!("line 1162");
     }
 
     // remove files
@@ -1094,6 +1171,8 @@ async fn cleanup_machine(
         METRICS_FILE_EXT,
         FLAMEGRAPH_FILE_EXT
     );
+    println!("line 1174");
     vm.exec(command).await.wrap_err("rm files")?;
+    println!("line 1176");
     Ok(())
 }
