@@ -232,7 +232,7 @@ async fn run_experiment(
                 return Err(Report::new(TimeoutError("start processes")));
             }
         }
-        println!("line 235");
+        
     } else {
         // if no, simply wait for start to finish
         start.await
@@ -261,7 +261,7 @@ async fn run_experiment(
                 return Err(Report::new(TimeoutError("run clients")));
             }
         }
-        println!("line 264");
+        
     } else {
         // if not, simply wait for run to finish
         run_clients.await
@@ -313,7 +313,7 @@ async fn run_experiment(
                 return Err(Report::new(TimeoutError("pull metrics and stop processes")));
             }
         }
-        println!("line 316");
+
     } else {
         // if not, simply wait for stop to finish
         pull_metrics_and_stop.await
@@ -781,7 +781,7 @@ async fn wait_process_ended(
             .await
             .wrap_err("pull_heaptrack_file")?;
         }
-        println!("line 784");
+
     }
     Ok(())
 }
